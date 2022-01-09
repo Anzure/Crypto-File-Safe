@@ -17,6 +17,8 @@ public class EncryptionDetails {
 
     private String fileName;
 
+    private Integer difficulty;
+
     private LocalDate date;
 
     private LocalTime time;

@@ -23,8 +23,6 @@ import java.util.Scanner;
 
 public class CryptoApp {
 
-    private static int ADDITIONAL_ROUNDS;
-
     private static Scanner scanner = new Scanner(System.in);
 
     public static void main(String... args) throws Exception {
@@ -41,13 +39,16 @@ public class CryptoApp {
         Integer actionInput = Integer.parseInt(scanner.nextLine());
         ActionType actionType = ActionType.values()[actionInput];
 
-        System.out.print("Enter difficulty: ");
-        ADDITIONAL_ROUNDS = Integer.parseInt(scanner.nextLine());
-
         if (actionType == ActionType.ENCRYPT_FILE) {
 
             System.out.print("Enter file name: ");
             String fileName = scanner.nextLine();
+
+            System.out.print("Enter difficulty: ");
+            Integer difficulty = Integer.parseInt(scanner.nextLine());
+
+            System.out.print("Enter passphrase: ");
+            String passphrase = scanner.nextLine();
 
             KeyPair keys = RSA.generateKeys();
 
@@ -58,37 +59,43 @@ public class CryptoApp {
             if (compressedFile.exists()) compressedFile.delete();
             if (detailsFile.exists()) detailsFile.delete();
 
-            long encryptionTime = encryptFile(contentFile, encryptedFile, keys.getPublic());
+            long encryptionTime = encryptFile(contentFile, encryptedFile, keys.getPublic(), difficulty);
             contentFile.delete();
             EncryptionDetails details = EncryptionDetails.builder()
                     .fileName(contentFile.getName())
                     .date(LocalDate.now())
                     .time(LocalTime.now())
                     .duration(Duration.ofMillis(encryptionTime))
+                    .difficulty(difficulty)
                     .publicKey(RSA.savePublicKey(keys.getPublic()))
                     .privateKey(RSA.savePrivateKey(keys.getPrivate()))
                     .build();
             objectMapper.writeValue(detailsFile, details);
 
             List<File> files = List.of(encryptedFile, detailsFile);
-            compressFiles(files, compressedFile, "password");
+            compressFiles(files, compressedFile, passphrase);
 
         } else if (actionType == ActionType.DECRYPT_FILE) {
 
             System.out.print("Enter file name: ");
             String fileName = scanner.nextLine();
 
+            System.out.print("Enter passphrase: ");
+            String passphrase = scanner.nextLine();
+
             File compressedFile = new File(fileName);
-            extractFiles(compressedFile, "password");
+            extractFiles(compressedFile, passphrase);
 
             EncryptionDetails details = objectMapper.readValue(detailsFile, EncryptionDetails.class);
+
+            Integer difficulty = details.getDifficulty();
 
             File contentFile = new File(details.getFileName());
             File encryptedFile = new File(contentFile.getName() + ".rsa");
 
             PrivateKey privateKey = RSA.loadPrivateKey(details.getPrivateKey());
 
-            decryptFile(encryptedFile, contentFile, privateKey);
+            decryptFile(encryptedFile, contentFile, privateKey, difficulty);
             detailsFile.delete();
             encryptedFile.delete();
         }
@@ -110,7 +117,7 @@ public class CryptoApp {
         files.forEach(file -> file.delete());
     }
 
-    private static long encryptFile(File file, File target, PublicKey publicKey) {
+    private static long encryptFile(File file, File target, PublicKey publicKey, int difficulty) {
         try (FileOutputStream outputStream = new FileOutputStream(target);
              FileInputStream inputStream = new FileInputStream(file)) {
             long startTime = System.currentTimeMillis();
@@ -128,7 +135,7 @@ public class CryptoApp {
 
                 // Write encrypted data
                 byte[] encrypted = RSA.encrypt(block, publicKey);
-                for (int x = 0; x < ADDITIONAL_ROUNDS; x++) {
+                for (int x = 0; x < difficulty; x++) {
                     encrypted = RSA.encrypt(block, publicKey);
                 }
 
@@ -145,7 +152,7 @@ public class CryptoApp {
 
                 // Write encrypted data
                 byte[] encrypted = RSA.encrypt(block, publicKey);
-                for (int x = 0; x < ADDITIONAL_ROUNDS; x++) {
+                for (int x = 0; x < difficulty; x++) {
                     encrypted = RSA.encrypt(block, publicKey);
                 }
 
@@ -164,7 +171,7 @@ public class CryptoApp {
         }
     }
 
-    private static long decryptFile(File file, File target, PrivateKey privateKey) {
+    private static long decryptFile(File file, File target, PrivateKey privateKey, int difficulty) {
         try (FileOutputStream outputStream = new FileOutputStream(target);
              FileInputStream inputStream = new FileInputStream(file)) {
             long startTime = System.currentTimeMillis();
@@ -182,7 +189,7 @@ public class CryptoApp {
 
                 // Write encrypted data
                 byte[] decrypted = RSA.decrypt(block, privateKey);
-                for (int x = 0; x < ADDITIONAL_ROUNDS; x++) {
+                for (int x = 0; x < difficulty; x++) {
                     decrypted = RSA.decrypt(block, privateKey);
                 }
 
@@ -199,7 +206,7 @@ public class CryptoApp {
 
                 // Write encrypted data
                 byte[] decrypted = RSA.decrypt(block, privateKey);
-                for (int x = 0; x < ADDITIONAL_ROUNDS; x++) {
+                for (int x = 0; x < difficulty; x++) {
                     decrypted = RSA.decrypt(block, privateKey);
                 }
 
