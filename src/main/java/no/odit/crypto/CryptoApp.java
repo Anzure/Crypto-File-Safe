@@ -1,6 +1,7 @@
 package no.odit.crypto;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.common.primitives.Bytes;
 import net.lingala.zip4j.ZipFile;
 import net.lingala.zip4j.model.ZipParameters;
 import net.lingala.zip4j.model.enums.AesKeyStrength;
@@ -18,6 +19,7 @@ import java.security.PublicKey;
 import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalTime;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Scanner;
 
@@ -33,44 +35,40 @@ public class CryptoApp {
         if (detailsFile.exists()) detailsFile.delete();
 
         System.out.println("Choose an action:");
-        System.out.println("0 - Encrypt a file");
-        System.out.println("1 - Decrypt a file");
+        System.out.println("1 - Encrypt a file");
+        System.out.println("2 - Decrypt a file");
         System.out.print("Enter action: ");
         Integer actionInput = Integer.parseInt(scanner.nextLine());
-        ActionType actionType = ActionType.values()[actionInput];
+        ActionType actionType = ActionType.values()[actionInput - 1];
 
         if (actionType == ActionType.ENCRYPT_FILE) {
 
             System.out.print("Enter file name: ");
             String fileName = scanner.nextLine();
+            File contentFile = new File(fileName);
+            if (!contentFile.exists()) {
+                System.out.println("The file do not exist!");
+                return;
+            }
 
-            System.out.print("Enter difficulty: ");
-            Integer difficulty = Integer.parseInt(scanner.nextLine());
+            System.out.print("Enter seconds: ");
+            Integer duration = Integer.parseInt(scanner.nextLine()) * 1000;
 
             System.out.print("Enter passphrase: ");
             String passphrase = scanner.nextLine();
 
             KeyPair keys = RSA.generateKeys();
 
-            File contentFile = new File(fileName);
             File encryptedFile = new File(contentFile.getName() + ".rsa");
             File compressedFile = new File(contentFile.getName() + ".zip");
             if (encryptedFile.exists()) encryptedFile.delete();
             if (compressedFile.exists()) compressedFile.delete();
             if (detailsFile.exists()) detailsFile.delete();
 
-            long encryptionTime = encryptFile(contentFile, encryptedFile, keys.getPublic(), difficulty);
+            EncryptionDetails result = encryptFile(contentFile, encryptedFile, keys.getPublic(), duration);
+            result.setPrivateKey(RSA.savePrivateKey(keys.getPrivate()));
             contentFile.delete();
-            EncryptionDetails details = EncryptionDetails.builder()
-                    .fileName(contentFile.getName())
-                    .date(LocalDate.now())
-                    .time(LocalTime.now())
-                    .duration(Duration.ofMillis(encryptionTime))
-                    .difficulty(difficulty)
-                    .publicKey(RSA.savePublicKey(keys.getPublic()))
-                    .privateKey(RSA.savePrivateKey(keys.getPrivate()))
-                    .build();
-            objectMapper.writeValue(detailsFile, details);
+            objectMapper.writeValue(detailsFile, result);
 
             List<File> files = List.of(encryptedFile, detailsFile);
             compressFiles(files, compressedFile, passphrase);
@@ -79,20 +77,21 @@ public class CryptoApp {
 
             System.out.print("Enter file name: ");
             String fileName = scanner.nextLine();
+            File compressedFile = new File(fileName);
+            if (!compressedFile.exists()) {
+                System.out.println("The file do not exist!");
+                return;
+            }
 
             System.out.print("Enter passphrase: ");
             String passphrase = scanner.nextLine();
 
-            File compressedFile = new File(fileName);
             extractFiles(compressedFile, passphrase);
 
             EncryptionDetails details = objectMapper.readValue(detailsFile, EncryptionDetails.class);
-
             Integer difficulty = details.getDifficulty();
-
             File contentFile = new File(details.getFileName());
             File encryptedFile = new File(contentFile.getName() + ".rsa");
-
             PrivateKey privateKey = RSA.loadPrivateKey(details.getPrivateKey());
 
             decryptFile(encryptedFile, contentFile, privateKey, difficulty);
@@ -117,111 +116,131 @@ public class CryptoApp {
         files.forEach(file -> file.delete());
     }
 
-    private static long encryptFile(File file, File target, PublicKey publicKey, int difficulty) {
+    private static EncryptionDetails encryptFile(File file, File target, PublicKey publicKey, long duration) {
         try (FileOutputStream outputStream = new FileOutputStream(target);
              FileInputStream inputStream = new FileInputStream(file)) {
             long startTime = System.currentTimeMillis();
+            long targetTime = startTime + duration;
 
             // Handle bytes
             int blockSize = 501;
-            long blocksNeeded = ((file.length()) / blockSize);
+            int difficulty = 0;
 
             // Encrypt blocks
-            for (int i = 0; i <= blocksNeeded - 1; i++) {
-                // Read a chunk of bytes
-                byte[] block = new byte[blockSize];
+            byte[] bytes = inputStream.readAllBytes();
+            do {
+                difficulty++;
+                long time = targetTime - System.currentTimeMillis();
+                long speed = bytes.length / time;
+                System.out.println("Encryption to " + difficulty + " difficulty... (speed: " + speed + "b/ms, time remains: " + (time/1000) + "s)");
+                int blocksNeeded = bytes.length / blockSize;
+//                System.out.println("Blocks needed: " + blocksNeeded);
+                byte[] content = new byte[0];
+                for (int i = 0; i <= blocksNeeded; i++) {
+                    // Handle a chunk of bytes
+                    int currentBlockSize = i != blocksNeeded ? blockSize : bytes.length - blocksNeeded * blockSize;
+                    if (currentBlockSize == 0) break;
+                    int fromIndex = i * blockSize;
+                    int toIndex = fromIndex + currentBlockSize;
+                    byte[] block = Arrays.copyOfRange(bytes, fromIndex, toIndex);
+//                    System.out.println("Test: " + fromIndex + " | " + toIndex + " | " + currentBlockSize + " | " + i + "/" + blocksNeeded);
 
-                inputStream.read(block, 0, blockSize);
-
-                // Write encrypted data
-                byte[] encrypted = RSA.encrypt(block, publicKey);
-                for (int x = 0; x < difficulty; x++) {
-                    encrypted = RSA.encrypt(block, publicKey);
+                    // Encrypt data
+                    byte[] encrypted = RSA.encrypt(block, publicKey);
+                    content = Bytes.concat(content, encrypted);
+//                    System.out.println("Debug: " + encrypted.length + " | " + content.length + " | " + bytes.length);
                 }
+                bytes = content;
 
-                outputStream.write(encrypted);
-            }
+            } while (System.currentTimeMillis() < targetTime);
 
-            // Encrypt last block
-            if (file.length() > blocksNeeded * blockSize) {
-                // Read last chunk of bytes
-                blockSize = (int) (file.length() - (blocksNeeded * blockSize));
-                byte[] block = new byte[blockSize];
-
-                inputStream.read(block, 0, blockSize);
-
-                // Write encrypted data
-                byte[] encrypted = RSA.encrypt(block, publicKey);
-                for (int x = 0; x < difficulty; x++) {
-                    encrypted = RSA.encrypt(block, publicKey);
-                }
-
-                outputStream.write(encrypted);
-            }
+            // Write file
+            outputStream.write(bytes);
 
             // Debug
+            System.out.println("Difficulty: " + difficulty);
             long endTime = System.currentTimeMillis();
             long time = endTime - startTime;
-            System.out.println("Encrypted: " + file.getName() + " finished in " + time + " ms.");
-            return time;
+            System.out.println("Encrypted: " + file.getName() + " finished in " + (time / 1000) + "s.");
+            return EncryptionDetails.builder()
+                    .fileName(file.getName())
+                    .date(LocalDate.now())
+                    .time(LocalTime.now())
+                    .duration(Duration.ofMillis(time))
+                    .difficulty(difficulty)
+                    .publicKey(RSA.savePublicKey(publicKey))
+                    .build();
 
         } catch (Exception e) {
             e.printStackTrace();
-            return 0;
+            return null;
         }
     }
 
-    private static long decryptFile(File file, File target, PrivateKey privateKey, int difficulty) {
+    private static void decryptFile(File file, File target, PrivateKey privateKey, int difficulty) {
         try (FileOutputStream outputStream = new FileOutputStream(target);
              FileInputStream inputStream = new FileInputStream(file)) {
             long startTime = System.currentTimeMillis();
 
             // Handle bytes
             int blockSize = 512;
-            long blocksNeeded = ((file.length()) / blockSize);
 
-            // Decrypt blocks
-            for (int i = 0; i <= blocksNeeded - 1; i++) {
-                // Read a chunk of bytes
-                byte[] block = new byte[blockSize];
+            // Read file
+            byte[] bytes = inputStream.readAllBytes();
 
-                inputStream.read(block, 0, blockSize);
-
-                // Write encrypted data
-                byte[] decrypted = RSA.decrypt(block, privateKey);
-                for (int x = 0; x < difficulty; x++) {
-                    decrypted = RSA.decrypt(block, privateKey);
+            // Prepare progress
+            long currentSize = 0;
+            long lastCurrent = bytes.length;
+            for (int x = 0; x < difficulty; x++) {
+                long blocksNeeded = lastCurrent / blockSize;
+                long tmpSize = 0;
+                for (int i = 0; i <= blocksNeeded; i++) {
+                    int currentBlockSize = i != blocksNeeded ? blockSize : (int) (lastCurrent - (blocksNeeded * blockSize));
+                    tmpSize += currentBlockSize - 11;
                 }
-
-                outputStream.write(decrypted);
+                currentSize += tmpSize;
+                lastCurrent = tmpSize;
             }
 
-            // Decrypt last block
-            if (file.length() > blocksNeeded * blockSize) {
-                // Read last chunk of bytes
-                blockSize = (int) (file.length() - (blocksNeeded * blockSize));
-                byte[] block = new byte[blockSize];
+            // Decrypt bytes
+            for (int diff = 0; diff < difficulty; diff++) {
+                long diffStart = System.currentTimeMillis();
+                byte[] content = new byte[0];
+                long blocksNeeded = bytes.length / blockSize;
+                for (int i = 0; i <= blocksNeeded; i++) {
+                    // Handle a chunk of bytes
+                    int currentBlockSize = i != blocksNeeded ? blockSize : (int) (bytes.length - (blocksNeeded * blockSize));
+                    if (currentBlockSize == 0) break;
+                    int fromIndex = i * blockSize;
+                    int toIndex = fromIndex + currentBlockSize;
+                    byte[] block = Arrays.copyOfRange(bytes, fromIndex, toIndex);
+//                    System.out.println("Test: " + fromIndex + " | " + toIndex + " | " + currentBlockSize + " | " + i + "/" + blocksNeeded);
 
-                inputStream.read(block, 0, blockSize);
-
-                // Write encrypted data
-                byte[] decrypted = RSA.decrypt(block, privateKey);
-                for (int x = 0; x < difficulty; x++) {
-                    decrypted = RSA.decrypt(block, privateKey);
+                    // Decrypt data
+                    byte[] decrypted = RSA.decrypt(block, privateKey);
+                    content = Bytes.concat(content, decrypted);
+//                    System.out.println("Debug: " + decrypted.length + " | " + content.length + " | " + bytes.length);
                 }
-
-                outputStream.write(decrypted);
+                currentSize -= content.length;
+                long diffTime = System.currentTimeMillis() - diffStart;
+                long diffSpeed = content.length / diffTime;
+                long estimate = currentSize / diffSpeed;
+//                System.out.println("Debug: " + diffTime + " | " + diffSpeed + " | " + estimate + " | " + content.length + " | " + bytes.length);
+                System.out.println("Decryption from " + (difficulty - diff) + " difficulty... (speed: "
+                        + diffSpeed + "b/ms, time remains: " + (estimate / 1000) + "s)");
+                bytes = content;
             }
+
+            // Write file
+            outputStream.write(bytes);
 
             // Debug
             long endTime = System.currentTimeMillis();
             long time = endTime - startTime;
-            System.out.println("Decrypted: " + file.getName() + " finished in " + time + " ms.");
-            return time;
+            System.out.println("Decrypted: " + file.getName() + " finished in " + (time / 1000) + "s.");
 
         } catch (Exception e) {
             e.printStackTrace();
-            return 0;
         }
     }
 
