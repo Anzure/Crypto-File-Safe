@@ -1,6 +1,7 @@
 package no.odit.crypto;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.common.primitives.Bytes;
 import net.lingala.zip4j.ZipFile;
 import net.lingala.zip4j.model.ZipParameters;
 import net.lingala.zip4j.model.enums.AesKeyStrength;
@@ -18,6 +19,7 @@ import java.security.PublicKey;
 import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalTime;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Scanner;
 
@@ -33,11 +35,11 @@ public class CryptoApp {
         if (detailsFile.exists()) detailsFile.delete();
 
         System.out.println("Choose an action:");
-        System.out.println("0 - Encrypt a file");
-        System.out.println("1 - Decrypt a file");
+        System.out.println("1 - Encrypt a file");
+        System.out.println("2 - Decrypt a file");
         System.out.print("Enter action: ");
         Integer actionInput = Integer.parseInt(scanner.nextLine());
-        ActionType actionType = ActionType.values()[actionInput];
+        ActionType actionType = ActionType.values()[actionInput-1];
 
         if (actionType == ActionType.ENCRYPT_FILE) {
 
@@ -122,56 +124,36 @@ public class CryptoApp {
 
             // Handle bytes
             int blockSize = 501;
-            long blocksNeeded = ((file.length()) / blockSize);
             int difficulty = 0;
 
-            System.out.println("Blocks needed: " + blocksNeeded);
-
             // Encrypt blocks
-
-            while (System.currentTimeMillis() < targetTime) {
-                byte[] bytes = inputStream.readAllBytes();
+            byte[] bytes = inputStream.readAllBytes();
+            do {
+                int blocksNeeded = bytes.length / blockSize;
+                System.out.println("Blocks needed: " + blocksNeeded);
+                byte[] content = new byte[0];
                 for (int i = 0; i <= blocksNeeded; i++) {
                     // Read a chunk of bytes
-                    int currentBlockSize = i != blocksNeeded ? blockSize : (int) (file.length() - (blocksNeeded * blockSize));
-                    byte[] block = new byte[currentBlockSize];
-
-                    for (int x = 0; x < currentBlockSize; x++){
-                        int offset = (int) (blocksNeeded * blockSize);
-                        block[x] = bytes[x + offset];
-                    }
-                    inputStream.read(block, 0, blockSize);
+                    int currentBlockSize = i != blocksNeeded ? blockSize : bytes.length - blocksNeeded * blockSize;
+                    if (currentBlockSize == 0) break;
+                    int fromIndex = i * blockSize;
+                    int toIndex = fromIndex+currentBlockSize;
+                    byte[] block = Arrays.copyOfRange(bytes, fromIndex, toIndex);
+                    System.out.println("Test: " + fromIndex + " | " + toIndex + " | " + currentBlockSize + " | " + i + "/" + blocksNeeded);
 
                     // Write encrypted data
                     byte[] encrypted = RSA.encrypt(block, publicKey);
-
-                    for (int x = 0; x < difficulty; x++) {
-                        encrypted = RSA.encrypt(block, publicKey);
-                    }
-
-                    outputStream.write(encrypted);
-                    System.out.println("Test");
+                    content = Bytes.concat(content, encrypted);
+                    System.out.println("Debug: " + encrypted.length + " | " + content.length + " | " + bytes.length);
                 }
-            }
+                bytes = content;
+                difficulty++;
+            } while (System.currentTimeMillis() < targetTime);
+
+            // Write file
+            outputStream.write(bytes);
 
             System.out.println("Difficulty: " + difficulty);
-
-//            // Encrypt last block
-//            if (file.length() > blocksNeeded * blockSize) {
-//                // Read last chunk of bytes
-//                blockSize = (int) (file.length() - (blocksNeeded * blockSize));
-//                byte[] block = new byte[blockSize];
-//
-//                inputStream.read(block, 0, blockSize);
-//
-//                // Write encrypted data
-//                byte[] encrypted = RSA.encrypt(block, publicKey);
-//                for (int x = 0; x < difficulty; x++) {
-//                    encrypted = RSA.encrypt(block, publicKey);
-//                }
-//
-//                outputStream.write(encrypted);
-//            }
 
             // Debug
             long endTime = System.currentTimeMillis();
@@ -199,40 +181,32 @@ public class CryptoApp {
 
             // Handle bytes
             int blockSize = 512;
-            long blocksNeeded = ((file.length()) / blockSize);
 
             // Decrypt blocks
-            for (int i = 0; i <= blocksNeeded - 1; i++) {
-                // Read a chunk of bytes
-                byte[] block = new byte[blockSize];
+            byte[] bytes = inputStream.readAllBytes();
+            for (int diff = 0; diff < difficulty; diff++){
+                byte[] content = new byte[0];
+                long blocksNeeded = bytes.length / blockSize;
+                for (int i = 0; i <= blocksNeeded; i++) {
+                    // Read a chunk of bytes
+                    int currentBlockSize = i != blocksNeeded ? blockSize : (int) (bytes.length - (blocksNeeded * blockSize));
+                    if (currentBlockSize == 0) break;
+                    int fromIndex = i * blockSize;
+                    int toIndex = fromIndex+currentBlockSize;
+                    byte[] block = Arrays.copyOfRange(bytes, fromIndex, toIndex);
+                    System.out.println("Test: " + fromIndex + " | " + toIndex + " | " + currentBlockSize + " | " + i + "/" + blocksNeeded);
 
-                inputStream.read(block, 0, blockSize);
-
-                // Write encrypted data
-                byte[] decrypted = RSA.decrypt(block, privateKey);
-                for (int x = 0; x < difficulty; x++) {
-                    decrypted = RSA.decrypt(block, privateKey);
+                    // Write encrypted data
+                    byte[] decrypted = RSA.decrypt(block, privateKey);
+                    content = Bytes.concat(content, decrypted);
+                    System.out.println("Debug: " + decrypted.length + " | " + content.length + " | " + bytes.length);
                 }
-
-                outputStream.write(decrypted);
+                bytes = content;
+                System.out.println("Diff: " + diff + " | " + (diff + 1));
             }
 
-            // Decrypt last block
-            if (file.length() > blocksNeeded * blockSize) {
-                // Read last chunk of bytes
-                blockSize = (int) (file.length() - (blocksNeeded * blockSize));
-                byte[] block = new byte[blockSize];
-
-                inputStream.read(block, 0, blockSize);
-
-                // Write encrypted data
-                byte[] decrypted = RSA.decrypt(block, privateKey);
-                for (int x = 0; x < difficulty; x++) {
-                    decrypted = RSA.decrypt(block, privateKey);
-                }
-
-                outputStream.write(decrypted);
-            }
+            // Write file
+            outputStream.write(bytes);
 
             // Debug
             long endTime = System.currentTimeMillis();
