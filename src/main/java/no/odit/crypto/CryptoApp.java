@@ -136,10 +136,11 @@ public class CryptoApp {
             do {
                 final byte[] tmpBytes = bytes;
                 int blocksNeeded = tmpBytes.length / blockSize;
-                byte[] content = IntStream.range(0, blocksNeeded).parallel().mapToObj(i -> {
+                int blocks = blocksNeeded + 1;
+                byte[] content = IntStream.range(0, blocks).parallel().mapToObj(i -> {
                     // Handle a chunk of bytes
                     int currentBlockSize = i != blocksNeeded ? blockSize : tmpBytes.length - blocksNeeded * blockSize;
-                    if (currentBlockSize == 0) return new byte[0];
+                    if (currentBlockSize == 0) return null;
                     int fromIndex = i * blockSize;
                     int toIndex = fromIndex + currentBlockSize;
                     byte[] block = Arrays.copyOfRange(tmpBytes, fromIndex, toIndex);
@@ -150,7 +151,7 @@ public class CryptoApp {
                 }).reduce((content1, content2) -> Bytes.concat(content1, content2)).get();
                 difficulty++;
                 long time = targetTime - System.currentTimeMillis();
-                long speed = bytes.length / time;
+                long speed = content.length / time;
                 System.out.println("Encryption to " + difficulty + " difficulty... (speed: " + speed + "bytes/ms, time remains: " + (time / 1000) + "s)");
                 bytes = content;
 
@@ -218,7 +219,7 @@ public class CryptoApp {
                 final byte[] tmpBytes = bytes;
                 int blocksNeeded = tmpBytes.length / blockSize;
                 int blocks = blocksNeeded + 1;
-                byte[] content = IntStream.range(0, blocksNeeded).parallel().mapToObj(i -> {
+                byte[] content = IntStream.range(0, blocks).parallel().mapToObj(i -> {
                     // Handle a chunk of bytes
                     int currentBlockSize = i != blocksNeeded ? blockSize : (tmpBytes.length - (blocksNeeded * blockSize));
                     if (currentBlockSize == 0) return new byte[0];
