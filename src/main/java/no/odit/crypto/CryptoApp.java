@@ -132,7 +132,7 @@ public class CryptoApp {
                 difficulty++;
                 long time = targetTime - System.currentTimeMillis();
                 long speed = bytes.length / time;
-                System.out.println("Encryption to " + difficulty + " difficulty... (speed: " + speed + "b/ms, time remains: " + (time/1000) + "s)");
+                System.out.println("Encryption to " + difficulty + " difficulty... (speed: " + speed + "bytes/ms, time remains: " + (time / 1000) + "s)");
                 int blocksNeeded = bytes.length / blockSize;
 //                System.out.println("Blocks needed: " + blocksNeeded);
                 byte[] content = new byte[0];
@@ -189,24 +189,38 @@ public class CryptoApp {
             byte[] bytes = inputStream.readAllBytes();
 
             // Prepare progress
-            long currentSize = 0;
-            long lastCurrent = bytes.length;
+//            long currentSize = 0;
+//            long lastCurrent = bytes.length;
+//            for (int x = 0; x < difficulty; x++) {
+//                long blocksNeeded = lastCurrent / blockSize;
+//                long tmpSize = 0;
+//                for (int i = 0; i <= blocksNeeded; i++) {
+//                    int currentBlockSize = i != blocksNeeded ? blockSize : (int) (lastCurrent - (blocksNeeded * blockSize));
+//                    tmpSize += currentBlockSize - 11;
+//                }
+//                currentSize += tmpSize;
+//                lastCurrent = tmpSize;
+//            }
+            long totalBlocks = 0;
+            long contentSize = bytes.length;
             for (int x = 0; x < difficulty; x++) {
-                long blocksNeeded = lastCurrent / blockSize;
+                long blocksNeeded = contentSize / blockSize;
                 long tmpSize = 0;
                 for (int i = 0; i <= blocksNeeded; i++) {
-                    int currentBlockSize = i != blocksNeeded ? blockSize : (int) (lastCurrent - (blocksNeeded * blockSize));
+                    int currentBlockSize = i != blocksNeeded ? blockSize : (int) (contentSize - (blocksNeeded * blockSize));
                     tmpSize += currentBlockSize - 11;
+                    totalBlocks++;
                 }
-                currentSize += tmpSize;
-                lastCurrent = tmpSize;
+                contentSize = tmpSize;
             }
+            long remainingBlocks = totalBlocks;
 
             // Decrypt bytes
             for (int diff = 0; diff < difficulty; diff++) {
                 long diffStart = System.currentTimeMillis();
                 byte[] content = new byte[0];
-                long blocksNeeded = bytes.length / blockSize;
+                int blocksNeeded = bytes.length / blockSize;
+                int blocks = 0;
                 for (int i = 0; i <= blocksNeeded; i++) {
                     // Handle a chunk of bytes
                     int currentBlockSize = i != blocksNeeded ? blockSize : (int) (bytes.length - (blocksNeeded * blockSize));
@@ -220,14 +234,26 @@ public class CryptoApp {
                     byte[] decrypted = RSA.decrypt(block, privateKey);
                     content = Bytes.concat(content, decrypted);
 //                    System.out.println("Debug: " + decrypted.length + " | " + content.length + " | " + bytes.length);
+                    blocks++;
                 }
-                currentSize -= content.length;
+                remainingBlocks -= blocks;
+//                currentSize -= content.length;
+//                System.out.println("Test: " + content.length + " | " + currentSize);
+//                long diffTime = System.currentTimeMillis() - diffStart;
+//                long diffSpeed = content.length / diffTime;
                 long diffTime = System.currentTimeMillis() - diffStart;
-                long diffSpeed = content.length / diffTime;
-                long estimate = currentSize / diffSpeed;
+
+                int diffSpeed = (int) (diffTime / blocks);
+                System.out.println("Debug: " + blocksNeeded + " | " + remainingBlocks + " | " + blocks + " | " + diffSpeed + " | " + diffTime);
+//                System.out.println("Info: " + diffSpeed + " | " + diffTime);
+//                long estimate = currentSize / diffSpeed;
+                int estimate = (int) (remainingBlocks * diffSpeed);
+
+                int progress = (int) ((totalBlocks-remainingBlocks) * 100 / totalBlocks);
 //                System.out.println("Debug: " + diffTime + " | " + diffSpeed + " | " + estimate + " | " + content.length + " | " + bytes.length);
+                System.out.println("Decryption block " + remainingBlocks + " of " + totalBlocks + " (" + progress + "%)");
                 System.out.println("Decryption from " + (difficulty - diff) + " difficulty... (speed: "
-                        + diffSpeed + "b/ms, time remains: " + (estimate / 1000) + "s)");
+                        + diffSpeed + "ms/block, time remains: " + (estimate / 1000) + "s)");
                 bytes = content;
             }
 
