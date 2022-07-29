@@ -5,6 +5,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
 
+import java.math.BigInteger;
 import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalTime;
@@ -17,7 +18,11 @@ public class EncryptionDetails {
 
     private String fileName;
 
-    private Integer difficulty;
+    private BigInteger n;
+
+    private BigInteger t;
+
+    private BigInteger z;
 
     private LocalDate date;
 
@@ -25,8 +30,18 @@ public class EncryptionDetails {
 
     private Duration duration;
 
-    private String privateKey;
+    private String ivParameterSpec;
 
-    private String publicKey;
+    @Deprecated
+    private String salt;
+
+    @Deprecated
+    private String machineId;
+
+    @Deprecated
+    private String applicationId;
+
+    @Deprecated
+    private String zipKey;
 
 }
