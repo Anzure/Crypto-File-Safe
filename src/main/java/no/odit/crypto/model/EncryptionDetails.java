@@ -32,16 +32,4 @@ public class EncryptionDetails {
 
     private String ivParameterSpec;
 
-    @Deprecated
-    private String salt;
-
-    @Deprecated
-    private String machineId;
-
-    @Deprecated
-    private String applicationId;
-
-    @Deprecated
-    private String zipKey;
-
 }

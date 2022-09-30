@@ -6,6 +6,7 @@ import net.lingala.zip4j.ZipFile;
 import net.lingala.zip4j.model.ZipParameters;
 import net.lingala.zip4j.model.enums.AesKeyStrength;
 import net.lingala.zip4j.model.enums.EncryptionMethod;
+import net.lingala.zip4j.util.FileUtils;
 import no.odit.crypto.model.EncryptionDetails;
 import no.odit.crypto.model.PuzzleDetails;
 import no.odit.crypto.type.ActionType;
@@ -15,9 +16,11 @@ import no.odit.crypto.util.TimeLockPuzzle;
 
 import javax.crypto.SecretKey;
 import javax.crypto.spec.IvParameterSpec;
+import java.io.Console;
 import java.io.File;
 import java.math.BigInteger;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.List;
@@ -25,11 +28,13 @@ import java.util.Scanner;
 
 public class CryptoApp {
 
-    public static String APPLICATION_ID = "tSaNPCqcs0YSxdbW";
+    public static String APPLICATION_ID = "fWyDzpN64CRQrDU5";
     private static String AES_ALGORITHM = "AES/CBC/PKCS5Padding";
     private static Scanner scanner = new Scanner(System.in);
 
     public static void main(String... args) throws Exception {
+
+        Console console = System.console();
 
         ObjectMapper objectMapper = new ObjectMapper();
         objectMapper.findAndRegisterModules();
@@ -57,7 +62,23 @@ public class CryptoApp {
             BigInteger duration = new BigInteger(scanner.nextLine());
 
             System.out.print("Enter passphrase: ");
-            String passphrase = scanner.nextLine();
+            String passphrase = new String(console.readPassword());
+            if (passphrase.length() < 8) throw new Error("Too short passphrase!");
+
+            System.out.print("Confirm passphrase: ");
+            if (!passphrase.equals(new String(console.readPassword()))) {
+                throw new Error("The passphrases do not match!");
+            }
+
+            System.out.print("Enter PIN code: ");
+            String pinCode = new String(console.readPassword());
+            BigInteger pinValue = new BigInteger(pinCode);
+            if (pinCode.length() < 8) throw new Error("Too short PIN code!");
+
+            System.out.print("Confirm PIN code: ");
+            if (!pinCode.equals(new String(console.readPassword()))) {
+                throw new Error("The PIN codes do not match!");
+            }
 
             System.out.println("Preparing files...");
             File encryptedFile = new File(contentFile.getName() + ".aes");
@@ -70,14 +91,12 @@ public class CryptoApp {
 
             System.out.println("Hashing password...");
             long startTime = System.currentTimeMillis();
-            String machineId = MachineUtil.getMachineIdentifier();
-            byte[] machineIdBytes = machineId.getBytes(StandardCharsets.UTF_8);
+            byte[] fileNameBytes = compressedFile.getName().getBytes(StandardCharsets.UTF_8);
             byte[] applicationIdBytes = APPLICATION_ID.getBytes(StandardCharsets.UTF_8);
-            String salt = new String(BCrypt.withDefaults().hash(14, applicationIdBytes, machineIdBytes), StandardCharsets.UTF_8);
+            String salt = new String(BCrypt.withDefaults().hash(16, applicationIdBytes, fileNameBytes), StandardCharsets.UTF_8);
             byte[] saltBytes = salt.substring(16, 32).getBytes(StandardCharsets.UTF_8);
             byte[] passphraseBytes = passphrase.getBytes(StandardCharsets.UTF_8);
-            String password = new String(BCrypt.withDefaults().hash(14, saltBytes, passphraseBytes), StandardCharsets.UTF_8);
-            long endTime = System.currentTimeMillis();
+            String password = new String(BCrypt.withDefaults().hash(16, saltBytes, passphraseBytes), StandardCharsets.UTF_8);            long endTime = System.currentTimeMillis();
             long time = endTime - startTime;
             System.out.println("Hashed password in " + time + "ms.");
 
@@ -95,6 +114,7 @@ public class CryptoApp {
             System.out.println("Creating puzzle...");
             startTime = System.currentTimeMillis();
             PuzzleDetails puzzle = TimeLockPuzzle.createPuzzle(encodedSecretKey, duration);
+            puzzle.setN(puzzle.getN().add(pinValue));
             endTime = System.currentTimeMillis();
             time = endTime - startTime;
             System.out.println("Puzzle created in " + time + "ms.");
@@ -111,10 +131,6 @@ public class CryptoApp {
             result.setN(puzzle.getN());
             result.setT(puzzle.getT());
             result.setZ(puzzle.getZ());
-            result.setSalt(salt);
-            result.setMachineId(machineId);
-            result.setApplicationId(APPLICATION_ID);
-            result.setZipKey(password);
             objectMapper.writeValue(detailsFile, result);
 
             System.out.println("Deleting unencrypted file...");
@@ -141,17 +157,32 @@ public class CryptoApp {
             }
 
             System.out.print("Enter passphrase: ");
-            String passphrase = scanner.nextLine();
+            String passphrase = new String(console.readPassword());
+            if (passphrase.length() < 8) throw new Error("Too short passphrase!");
+
+            System.out.print("Confirm passphrase: ");
+            if (!passphrase.equals(new String(console.readPassword()))) {
+                throw new Error("The passphrases do not match!");
+            }
+
+            System.out.print("Enter PIN code: ");
+            String pinCode = new String(console.readPassword());
+            BigInteger pinValue = new BigInteger(pinCode);
+            if (pinCode.length() < 8) throw new Error("Too short PIN code!");
+
+            System.out.print("Confirm PIN code: ");
+            if (!pinCode.equals(new String(console.readPassword()))) {
+                throw new Error("The PIN codes do not match!");
+            }
 
             System.out.println("Hashing password...");
             long startTime = System.currentTimeMillis();
-            String machineId = MachineUtil.getMachineIdentifier();
-            byte[] machineIdBytes = machineId.getBytes(StandardCharsets.UTF_8);
+            byte[] fileNameBytes = compressedFile.getName().getBytes(StandardCharsets.UTF_8);
             byte[] applicationIdBytes = APPLICATION_ID.getBytes(StandardCharsets.UTF_8);
-            String salt = new String(BCrypt.withDefaults().hash(14, applicationIdBytes, machineIdBytes), StandardCharsets.UTF_8);
+            String salt = new String(BCrypt.withDefaults().hash(16, applicationIdBytes, fileNameBytes), StandardCharsets.UTF_8);
             byte[] saltBytes = salt.substring(16, 32).getBytes(StandardCharsets.UTF_8);
             byte[] passphraseBytes = passphrase.getBytes(StandardCharsets.UTF_8);
-            String password = new String(BCrypt.withDefaults().hash(14, saltBytes, passphraseBytes), StandardCharsets.UTF_8);
+            String password = new String(BCrypt.withDefaults().hash(16, saltBytes, passphraseBytes), StandardCharsets.UTF_8);
             long endTime = System.currentTimeMillis();
             long time = endTime - startTime;
             System.out.println("Hashed password in " + time + "ms.");
@@ -159,6 +190,7 @@ public class CryptoApp {
             System.out.println("Extracting files...");
             startTime = System.currentTimeMillis();
             extractFiles(compressedFile, password);
+
             endTime = System.currentTimeMillis();
             time = endTime - startTime;
             System.out.println("Extracted files in " + time + "ms.");
@@ -167,10 +199,13 @@ public class CryptoApp {
             EncryptionDetails details = objectMapper.readValue(detailsFile, EncryptionDetails.class);
             File contentFile = new File(details.getFileName());
             File encryptedFile = new File(contentFile.getName() + ".aes");
+            Files.setAttribute(detailsFile.toPath(), "dos:hidden", true);
+            Files.setAttribute(encryptedFile.toPath(), "dos:hidden", true);
             IvParameterSpec iv = AES.decodeIvParameterSpec(details.getIvParameterSpec());
 
             System.out.println("Solving puzzle... (this may take a while!)");
             startTime = System.currentTimeMillis();
+            details.setN(details.getN().subtract(pinValue));
             String secret = TimeLockPuzzle.solvePuzzle(details.getN(), details.getT(), details.getZ());
             endTime = System.currentTimeMillis();
             time = endTime - startTime;
@@ -195,7 +230,6 @@ public class CryptoApp {
             System.out.println("Deleting compressed file...");
             compressedFile.delete();
 
-
             System.out.println("Completed decryption task!");
         }
     }
@@ -218,12 +252,8 @@ public class CryptoApp {
     private static EncryptionDetails encryptFile(File inputFile, File outputFile, SecretKey secretKey, IvParameterSpec iv) {
         try {
 
-
             // Encrypt file
             AES.encryptFile(AES_ALGORITHM, secretKey, iv, inputFile, outputFile);
-
-            // Debug
-
 
             // Return result
             return EncryptionDetails.builder()
@@ -235,15 +265,6 @@ public class CryptoApp {
         } catch (Exception e) {
             e.printStackTrace();
             return null;
-        }
-    }
-
-    private static void decryptFile(File inputFile, File outputFile, SecretKey secretKey, IvParameterSpec iv) {
-        try {
-
-
-        } catch (Exception e) {
-            e.printStackTrace();
         }
     }
 
