@@ -57,7 +57,7 @@ public class CryptoApp {
 
                 File contentFile = InputUtil.inputFile("file name");
                 String fileName = FileUtils.getFileNameWithoutExtension(contentFile.getName());
-                String fileExtension = FileUtils.getFileNameWithoutExtension(contentFile.getName());
+                String fileExtension = FileUtils.getFileExtension(contentFile);
                 BigInteger duration = InputUtil.inputNumber("seconds", 5);
                 String passphrase = InputUtil.inputSecretText("passphrase", 8);
                 BigInteger pinCode = InputUtil.inputSecretNumber("PIN code", 8);
