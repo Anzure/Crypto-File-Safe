@@ -6,7 +6,6 @@ import lombok.Data;
 import lombok.RequiredArgsConstructor;
 
 import java.math.BigInteger;
-import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalTime;
 
@@ -18,6 +17,8 @@ public class EncryptionDetails {
 
     private String fileName;
 
+    private String fileExtension;
+
     private BigInteger n;
 
     private BigInteger t;
@@ -27,8 +28,6 @@ public class EncryptionDetails {
     private LocalDate date;
 
     private LocalTime time;
-
-    private Duration duration;
 
     private String ivParameterSpec;
 
