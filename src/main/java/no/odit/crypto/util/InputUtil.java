@@ -3,12 +3,14 @@ package no.odit.crypto.util;
 import java.io.File;
 import java.math.BigInteger;
 
+import static no.odit.crypto.CryptoApp.scanner;
+
 public class InputUtil {
 
     public static File inputFile(String what) throws Exception {
         try {
             System.out.print("Enter " + what + ": ");
-            String fileName = System.console().readLine();
+            String fileName = scanner.nextLine();
             File contentFile = new File(fileName);
             if (!contentFile.exists()) {
                 throw new Exception("The " + what + " do not exist!");
@@ -23,14 +25,23 @@ public class InputUtil {
         }
     }
 
+    private static String inputHiddenText() {
+        return System.console() == null ? scanner.nextLine() : new String(System.console().readPassword());
+    }
+
     public static String inputSecretText(String what, int minimumLength) throws Exception {
         try {
+            if (System.console() == null) {
+                System.out.println("Warning: Unable to hide secret input from console!");
+            }
+
             System.out.print("Enter " + what + ": ");
-            String passphrase = new String(System.console().readPassword());
+            String passphrase = inputHiddenText();
             if (passphrase.length() < minimumLength) throw new Exception("Too short " + what + "!");
 
             System.out.print("Confirm " + what + ": ");
-            if (!passphrase.equals(new String(System.console().readPassword()))) {
+            String confirm = inputHiddenText();
+            if (!passphrase.equals(confirm)) {
                 throw new Exception("The " + what + "s do not match!");
             }
             return passphrase;
@@ -57,7 +68,7 @@ public class InputUtil {
     public static BigInteger inputNumber(String what, long minimumLength) throws Exception {
         try {
             System.out.print("Enter " + what + ": ");
-            BigInteger bigInteger = new BigInteger(System.console().readLine());
+            BigInteger bigInteger = new BigInteger(scanner.nextLine());
             if (bigInteger.longValueExact() < minimumLength) throw new Exception("Too short " + what + "!");
             return bigInteger;
         } catch (Exception exception) {
@@ -70,7 +81,7 @@ public class InputUtil {
 
     public static boolean inputRetry() {
         System.out.print("Do you want to try again? (Y/n): ");
-        return System.console().readLine().equalsIgnoreCase("y");
+        return scanner.nextLine().equalsIgnoreCase("y");
     }
 
 }

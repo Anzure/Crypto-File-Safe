@@ -31,7 +31,7 @@ public class CryptoApp {
     public static String APPLICATION_ID = "fWyDzpN64CRQrDU5";
     private static String AES_ALGORITHM = "AES/CBC/PKCS5Padding";
     private static String DETAILS_FILE_NAME = "capsule.json";
-    private static Scanner scanner = new Scanner(System.in);
+    public static Scanner scanner = new Scanner(System.in);
 
     private static List<File> deleteQueue = new ArrayList<>();
 
@@ -58,14 +58,14 @@ public class CryptoApp {
                 File contentFile = InputUtil.inputFile("file name");
                 String fileName = FileUtils.getFileNameWithoutExtension(contentFile.getName());
                 String fileExtension = FileUtils.getFileExtension(contentFile);
-                BigInteger duration = InputUtil.inputNumber("seconds", 5);
-                String passphrase = InputUtil.inputSecretText("passphrase", 8);
-                BigInteger pinCode = InputUtil.inputSecretNumber("PIN code", 8);
+                BigInteger duration = InputUtil.inputNumber("seconds", 2);
+                String passphrase = InputUtil.inputSecretText("passphrase", 6);
+                BigInteger pinCode = InputUtil.inputSecretNumber("PIN code", 4);
                 String password = hashPassword(passphrase, fileName);
 
                 System.out.println("Preparing files...");
-                File encryptedFile = new File(fileName + ".aes");
-                File containerFile = new File(fileName + ".safe");
+                File encryptedFile = new File(fileName + ".enc");
+                File containerFile = new File(fileName + ".vault");
 
                 System.out.println("Generating keys...");
                 startTime = System.currentTimeMillis();
@@ -131,8 +131,8 @@ public class CryptoApp {
 
                 File containerFile = InputUtil.inputFile("file name");
                 String fileName = FileUtils.getFileNameWithoutExtension(containerFile.getName());
-                String passphrase = InputUtil.inputSecretText("passphrase", 8);
-                BigInteger pinCode = InputUtil.inputSecretNumber("PIN code", 8);
+                String passphrase = InputUtil.inputSecretText("passphrase", 6);
+                BigInteger pinCode = InputUtil.inputSecretNumber("PIN code", 4);
                 String password = hashPassword(passphrase, fileName);
 
                 System.out.println("Reading details...");
@@ -155,7 +155,7 @@ public class CryptoApp {
 
                 System.out.println("Decrypting file...");
                 startTime = System.currentTimeMillis();
-                File encryptedFile = extractFile(fileName + ".aes", containerFile, password);
+                File encryptedFile = extractFile(fileName + ".enc", containerFile, password);
                 forceDeleteFile(containerFile);
                 AES.decryptFile(AES_ALGORITHM, secretKey, iv, encryptedFile, contentFile);
                 forceDeleteFile(encryptedFile);

@@ -1,18 +1,22 @@
 # Crypto-File-Safe
+
 Encrypt files with delayed decryption time.
 This is a command line interface application.
 
 ## Start application
+
 To run the application, you need Java 11 or higher.
 
 You may start the application by executing this command:
+
 ```
 java -jar Crypto-File-Safe-1.0.jar
 ```
 
-
 ## Encrypt a file
+
 Here you have an example of how you can encrypt a file with ``test.pdf`` as name.
+
 ```
 Choose an action:
 0 - Encrypt a file
@@ -27,7 +31,9 @@ Encrypted: test.pdf finished in 352 ms.
 ```
 
 ## Decrypt a file
+
 This example shows you how to decrypt the file ``test.pdf.zip`` from last example.
+
 ```
 Choose an action:
 0 - Encrypt a file
